@@ -91,6 +91,21 @@ def run(context):
                 or health == adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState):
             message = extrude2.errorOrWarningMessage
 
+        design = app.activeProduct
+        exportMgr = design.exportManager
+
+        # export
+        dir = "C:/honto-goe/"
+        filename = str(size)+"_"+str(corner)+"_"+str(depth)+".step"
+        stepOptions = exportMgr.createSTEPExportOptions(dir+filename)
+        res = exportMgr.execute(stepOptions)
+
+        # clean up
+        extrude2.deleteMe()
+        sketch2.deleteMe()
+        extrude1.deleteMe()
+        sketch.deleteMe()
+
     except Exception as e:
         if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
