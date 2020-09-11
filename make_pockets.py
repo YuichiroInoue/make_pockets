@@ -170,19 +170,26 @@ def run(context):
         size = 3.0
         depth = 2.0
         corner = 1.0
-        # make pocket
-        pocket = Pocket(size, depth, corner)
-        pocket.build()
 
-        exportMgr = design.exportManager
+        for i in range(10):
+            depth = round(1.0+i*0.1, 4)
+            for j in range(50):
+                corner = round(0.5+j*0.01, 4)
+                # make pocket
+                pocket = Pocket(size, depth, corner)
+                pocket.build()
 
-        # export
-        filename = str(size)+"_"+str(corner)+"_"+str(depth)+".step"
-        stepOptions = exportMgr.createSTEPExportOptions(output_dir+filename)
-        res = exportMgr.execute(stepOptions)
+                exportMgr = design.exportManager
 
-        # clean up
-        pocket.delete()
+                # export
+                filename = str(size)+"_"+str(corner)+"_"+str(depth)+".step"
+                stepOptions = exportMgr.createSTEPExportOptions(
+                    output_dir+filename)
+                res = exportMgr.execute(stepOptions)
+
+                # clean up
+                pocket.delete()
+
         main_body.delete()
 
     except Exception as e:
