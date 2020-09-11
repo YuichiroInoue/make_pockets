@@ -5,30 +5,48 @@ import adsk.core
 import adsk.fusion
 import adsk.cam
 import traceback
+import os
+
+app = adsk.core.Application.get()
+# doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
+design = app.activeProduct
+# Get the root component of the active design.
+rootComp = design.rootComponent
 
 
-def run(context):
-    ui = None
-    try:
-        app = adsk.core.Application.get()
-        # ui = app.userInterface
-        # ui.messageBox('Hello script')
+class MainBody:
+    def __init__(self, size, depth):
+        self._size = size
+        self._depth = depth
 
-        #doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
-        design = app.activeProduct
+    @property
+    def size(self):
+        return self._size
 
-        # Get the root component of the active design.
-        rootComp = design.rootComponent
+    @size.setter
+    def size(self, value):
+        self_size = value
 
+    @property
+    def depth(self):
+        return self._depth
+
+    @depth.setter
+    def depth(self, value):
+        self._depth = depth
+
+    # main_extrude = adsk.fusion.ExtrudeFeature
+
+    def build(self):
         # Create a new sketch on the xy plane.
-        sketches = rootComp.sketches
+        body_sketches = rootComp.sketches
         xyPlane = rootComp.xYConstructionPlane
-        sketch = sketches.add(xyPlane)
-
+        sketch = body_sketches.add(xyPlane)
+        self._sketch = sketch
         lines = sketch.sketchCurves.sketchLines
 
         # make square
-        size = 5.0
+        size = self._size
 
         point1 = adsk.core.Point3D.create(size/2, size/2, 0)
         point2 = adsk.core.Point3D.create(-size/2, size/2, 0)
@@ -43,7 +61,7 @@ def run(context):
         # extrude
         extrudes = rootComp.features.extrudeFeatures
         prof = sketch.profiles.item(0)
-        distance = adsk.core.ValueInput.createByReal(-3)
+        distance = adsk.core.ValueInput.createByReal(self._depth*-1)
         extrude1 = extrudes.addSimple(
             prof, distance, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
 
@@ -55,15 +73,55 @@ def run(context):
         if (health == adsk.fusion.FeatureHealthStates.WarningFeatureHealthState
                 or health == adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState):
             message = extrude1.errorOrWarningMessage
+        else:
+            self._extrude = extrude1
+            pass
 
-        # make pocket
-        size = 3.0
-        corner = 1.0
-        depth = 2.0
+    def delete(self):
+        self._extrude.deleteMe()
+        self._sketch.deleteMe()
 
-        sketch2 = sketches.add(xyPlane)
-        lines = sketch2.sketchCurves.sketchLines
-        arcs = sketch2.sketchCurves.sketchArcs
+
+class Pocket:
+    def __init__(self, size, depth, corner):
+        self._size = size
+        self._depth = depth
+        self._corner = corner
+
+    @property
+    def size(self):
+        return self._size
+
+    @size.setter
+    def size(self, value):
+        self_size = value
+
+    @property
+    def depth(self):
+        return self._depth
+
+    @depth.setter
+    def depth(self, value):
+        self._depth = depth
+
+    @property
+    def corner(self):
+        return self._corner
+
+    @corner.setter
+    def corner(self, value):
+        self._corner = corner
+
+    def build(self):
+        # Create a new sketch on the xy plane.
+        body_sketches = rootComp.sketches
+        xyPlane = rootComp.xYConstructionPlane
+        sketch = body_sketches.add(xyPlane)
+        self._sketch = sketch
+        lines = sketch.sketchCurves.sketchLines
+        arcs = sketch.sketchCurves.sketchArcs
+        size = self._size
+        corner = self._corner
 
         point1 = adsk.core.Point3D.create(size/2, size/2, 0)
         point2 = adsk.core.Point3D.create(-size/2, size/2, 0)
@@ -80,31 +138,52 @@ def run(context):
         arcs.addFillet(line2, point3, line3, point3, corner)
         arcs.addFillet(line3, point4, line4, point4, corner)
 
-        extrudes2 = rootComp.features.extrudeFeatures
-
-        extrude2 = extrudes2.addSimple(sketch2.profiles.item(0), adsk.core.ValueInput.createByReal(depth*-1),
-                                       adsk.fusion.FeatureOperations.CutFeatureOperation)
+        extrudes = rootComp.features.extrudeFeatures
+        extrude2 = extrudes.addSimple(sketch.profiles.item(0), adsk.core.ValueInput.createByReal(self._depth*-1),
+                                      adsk.fusion.FeatureOperations.CutFeatureOperation)
 
         # health check
         health = extrude2.healthState
         if (health == adsk.fusion.FeatureHealthStates.WarningFeatureHealthState
                 or health == adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState):
             message = extrude2.errorOrWarningMessage
+        else:
+            self._extrude = extrude2
+            pass
 
-        design = app.activeProduct
+    def delete(self):
+        self._extrude.deleteMe()
+        self._sketch.deleteMe()
+
+
+def run(context):
+    ui = None
+    try:
+
+        output_dir = os.getenv("HOMEDRIVE") + \
+            os.getenv("HOMEPATH")+"/desktop/fusion360api/"
+        os.makedirs(output_dir, exist_ok=True)
+
+        main_body = MainBody(5.0, 3.0)
+        main_body.build()
+
+        size = 3.0
+        depth = 2.0
+        corner = 1.0
+        # make pocket
+        pocket = Pocket(size, depth, corner)
+        pocket.build()
+
         exportMgr = design.exportManager
 
         # export
-        dir = "C:/honto-goe/"
         filename = str(size)+"_"+str(corner)+"_"+str(depth)+".step"
-        stepOptions = exportMgr.createSTEPExportOptions(dir+filename)
+        stepOptions = exportMgr.createSTEPExportOptions(output_dir+filename)
         res = exportMgr.execute(stepOptions)
 
         # clean up
-        extrude2.deleteMe()
-        sketch2.deleteMe()
-        extrude1.deleteMe()
-        sketch.deleteMe()
+        pocket.delete()
+        main_body.delete()
 
     except Exception as e:
         if ui:
